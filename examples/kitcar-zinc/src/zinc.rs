@@ -36,7 +36,7 @@ use insim_extra::{
     },
 };
 
-use crate::{rank::RankCard, topbar::Topbar};
+use crate::{clock::Clock, rank::RankCard, top::Leaderboard, topbar::Topbar};
 
 /// A licence ladder. Rung `n` needs `n` points, and rungs stack. The ladder
 /// itself is configuration, defined in `main.rs` as `LICENCES`.
@@ -85,10 +85,12 @@ impl Driver {
 pub enum Cmd {
     /// Your points, yellow flags and cars.
     Stats,
-    /// The drivers with the most points.
+    /// The leaderboard, a page at a time. Again to close.
     Top,
     /// Your rank, in a panel. Again to close.
     Rank,
+    /// A clock in the middle of your screen. Click it to close.
+    Clock,
     /// List the commands.
     Help,
     /// Move on to the next track now.
@@ -103,12 +105,24 @@ pub struct Zinc {
     drivers: HashMap<String, Driver>,
     /// Who has their rank card open.
     rank_open: HashSet<ConnectionId>,
+    /// Who has the leaderboard open.
+    top_open: HashSet<ConnectionId>,
+    /// Who has the clock open.
+    clock_open: HashSet<ConnectionId>,
+}
+
+/// A panel a player opens with a command.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Panel {
+    Rank,
+    Top,
+    Clock,
 }
 
 #[derive(Debug, Clone)]
 pub enum Msg {
-    /// A player closed their rank card.
-    CloseRank(ConnectionId),
+    /// A player closed a panel.
+    Close(Panel, ConnectionId),
 }
 
 impl Zinc {
@@ -117,6 +131,25 @@ impl Zinc {
             ladder,
             drivers: HashMap::new(),
             rank_open: HashSet::new(),
+            top_open: HashSet::new(),
+            clock_open: HashSet::new(),
+        }
+    }
+
+    /// Who has `panel` open.
+    fn open(&mut self, panel: Panel) -> &mut HashSet<ConnectionId> {
+        match panel {
+            Panel::Rank => &mut self.rank_open,
+            Panel::Top => &mut self.top_open,
+            Panel::Clock => &mut self.clock_open,
+        }
+    }
+
+    /// Open `panel` for `ucid` if it's closed, or close it.
+    fn toggle(&mut self, panel: Panel, ucid: ConnectionId) {
+        let open = self.open(panel);
+        if !open.remove(&ucid) {
+            let _ = open.insert(ucid);
         }
     }
 
@@ -212,13 +245,15 @@ fn joined(zinc: &mut Zinc, event: &Connected, _: &Context<'_>) -> Effects<Msg> {
 }
 
 fn left(zinc: &mut Zinc, event: &Disconnected, _: &Context<'_>) {
-    let _ = zinc.rank_open.remove(&event.ucid);
+    for panel in [Panel::Rank, Panel::Top, Panel::Clock] {
+        let _ = zinc.open(panel).remove(&event.ucid);
+    }
 }
 
 fn message(zinc: &mut Zinc, msg: Msg, _: &Context<'_>) {
     match msg {
-        Msg::CloseRank(ucid) => {
-            let _ = zinc.rank_open.remove(&ucid);
+        Msg::Close(panel, ucid) => {
+            let _ = zinc.open(panel).remove(&ucid);
         },
     }
 }
@@ -236,8 +271,9 @@ fn help() -> String {
         .join("\n")
 }
 
-/// The topbar, always, and the rank card while open. The card is placed only
-/// while open, so each opening mounts it afresh with a new snapshot.
+/// The topbar, always, and each panel while open. Panels are placed only
+/// while open, so each opening mounts them afresh: a new rank snapshot, the
+/// leaderboard's first page, a clock that starts ticking.
 fn view(
     zinc: &Zinc,
     ucid: ConnectionId,
@@ -246,12 +282,24 @@ fn view(
 ) -> Option<Node<Msg>> {
     let topbar = Topbar::of(zinc, ucid, cx, ui).render();
     let uname = cx.world().connection(ucid)?.uname.as_str();
-    let rank_open = zinc.rank_open.contains(&ucid);
-    Some(ui::container().with_child(topbar).when(rank_open, |root| {
-        root.with_child(ui.child(
-            Child::with_props((zinc, uname), RankCard::default).on(move |()| Msg::CloseRank(ucid)),
-        ))
-    }))
+    let close = move |panel| move |()| Msg::Close(panel, ucid);
+    Some(
+        ui::container()
+            .with_child(topbar)
+            .when(zinc.rank_open.contains(&ucid), |root| {
+                root.with_child(ui.child(
+                    Child::with_props((zinc, uname), RankCard::default).on(close(Panel::Rank)),
+                ))
+            })
+            .when(zinc.top_open.contains(&ucid), |root| {
+                root.with_child(
+                    ui.child(Child::with_props(zinc, Leaderboard::default).on(close(Panel::Top))),
+                )
+            })
+            .when(zinc.clock_open.contains(&ucid), |root| {
+                root.with_child(ui.child(Child::new(Clock::default).on(close(Panel::Clock))))
+            }),
+    )
 }
 
 /// LFS asks before anyone takes the track (a join request: an `Npl` with no
@@ -411,24 +459,16 @@ fn command(zinc: &mut Zinc, caller: Caller, cmd: Cmd, _: &Context<'_>) -> Effect
             ))
         },
         Cmd::Rank => {
-            if !zinc.rank_open.remove(&caller.ucid) {
-                let _ = zinc.rank_open.insert(caller.ucid);
-            }
+            zinc.toggle(Panel::Rank, caller.ucid);
             Effects::none()
         },
         Cmd::Top => {
-            let lines: Vec<String> = zinc
-                .ranked()
-                .into_iter()
-                .take(5)
-                .enumerate()
-                .map(|(i, (uname, d))| format!("^7{}. {uname} - ^2{}", i + 1, d.points))
-                .collect();
-            if lines.is_empty() {
-                caller.reply("^7No points yet - finish a race cleanly!")
-            } else {
-                caller.reply(lines.join("\n"))
-            }
+            zinc.toggle(Panel::Top, caller.ucid);
+            Effects::none()
+        },
+        Cmd::Clock => {
+            zinc.toggle(Panel::Clock, caller.ucid);
+            Effects::none()
         },
         Cmd::Help => caller.reply(help()),
         // The router refuses non-admins before it gets here.
@@ -873,8 +913,26 @@ mod tests {
         assert!(!zinc.state().rank_open.contains(&bob));
 
         let _ = zinc.update(command_from(2, "!rank"), &cx);
-        let _ = zinc.update(Input::Msg(Msg::CloseRank(bob)), &cx);
+        let _ = zinc.update(Input::Msg(Msg::Close(Panel::Rank, bob)), &cx);
         assert!(!zinc.state().rank_open.contains(&bob));
+    }
+
+    #[test]
+    fn top_and_clock_toggle_and_close() {
+        let world = world();
+        let cx = Context::new(&world, Instant::now());
+        let mut zinc = service(crate::LICENCES);
+        let bob = ConnectionId(2);
+
+        let _ = zinc.update(command_from(2, "!top"), &cx);
+        let _ = zinc.update(command_from(2, "!clock"), &cx);
+        assert!(zinc.state().top_open.contains(&bob));
+        assert!(zinc.state().clock_open.contains(&bob));
+
+        let _ = zinc.update(command_from(2, "!top"), &cx);
+        let _ = zinc.update(Input::Msg(Msg::Close(Panel::Clock, bob)), &cx);
+        assert!(!zinc.state().top_open.contains(&bob));
+        assert!(!zinc.state().clock_open.contains(&bob));
     }
 
     #[test]
@@ -925,7 +983,8 @@ mod tests {
                 .unwrap_or_else(|| panic!("no {text:?} button"))
         };
         assert_eq!(at("!help"), 0);
-        assert_eq!(at("Your rank"), 60);
+        // The card's title, inside its panel's padding.
+        assert_eq!(at("Your rank"), 62);
         // A clickable button shows the mouse cursor, which gets in the way of
         // mouse steering, so the always-on bar has none.
         assert!(

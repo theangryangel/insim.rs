@@ -1,8 +1,8 @@
-//! Bare-insim race tracker example using [`SharedWorld::attach`].
+//! Bare-insim race tracker example, folding packets into a [`World`] by hand.
 //!
-//! - The session is split, and the world follows it on its own: it requests the
-//!   server's state on startup and again on each `SessionStarted`, so the tracker
-//!   repopulates for every new session.
+//! - One read loop: each packet goes through [`World::apply`], and the requests
+//!   it hands back are sent. The world asks for the server's state again on
+//!   each `SessionStarted`, so the tracker repopulates for every new session.
 //! - On each confirmed result (`Res` -> `ResultConfirmed`) it reprints the
 //!   table, so the classification builds up live as drivers cross the line.
 //! - On `SessionEnded` (back to the lobby screen) it prints the final results
@@ -18,7 +18,7 @@ use std::time::Duration;
 use clap::Parser;
 use insim::{Session, identifiers::RequestId, insim::Isi};
 use insim_extra::world::{
-    SharedWorld, World, WorldEvent,
+    Applied, World, WorldEvent,
     event::{SessionEnded, SessionStarted},
     race::{EntrantState, FinishStatus, RaceEvent},
 };
@@ -60,84 +60,86 @@ async fn main() -> insim::Result<()> {
         admin: args.admin_password.unwrap_or_default(),
         ..Isi::default()
     };
-    let conn = Session::tcp(stream)?.handshake(isi).await?;
+    let mut session = Session::tcp(stream)?.handshake(isi).await?;
     tracing::info!("connected");
 
-    // Only the world's events are needed, so drop the receiver: the driver then
-    // discards packets after taps have copied them. (A receiver kept but never
-    // read would eventually fill up and pause reading.)
-    let (sender, _, driver) = conn.into_split(256);
-    let driver = tokio::spawn(driver);
+    // LFS doesn't volunteer who's already there: ask once. Ready follows once
+    // every reply is in.
+    let mut world = World::new();
+    for request in World::startup() {
+        session.write(request).await?;
+    }
 
-    let world = SharedWorld::default();
-    let mut events = world.attach(&sender).await?;
-
-    while let Some(event) = events.recv().await {
-        match event {
-            WorldEvent::Ready(_) => {
-                tracing::info!(entrants = world.read().entrants().count(), "world ready");
-            },
-            WorldEvent::SessionStarted(SessionStarted { kind }) => {
-                tracing::info!(?kind, "session started");
-            },
-            WorldEvent::SessionEnded(SessionEnded) => {
-                tracing::info!("session ended");
-                print_results(&world.read(), "Final Race Results");
-            },
-            WorldEvent::Race(ref e) => {
-                match e {
-                    RaceEvent::PersonalBest {
-                        id,
-                        lap,
-                        time,
-                        previous,
-                        ..
-                    } => {
-                        let driver = world
-                            .read()
-                            .entrant(*id)
-                            .and_then(|e| e.drivers.last().map(|d| d.pname.clone()))
-                            .unwrap_or_else(|| "?".to_string());
-                        let prev = previous
-                            .map(|p| format!(" (was {})", fmt_duration(p)))
-                            .unwrap_or_default();
-                        println!(
-                            "[PB] {:<20}  {}{}  lap {}",
-                            driver,
-                            fmt_duration(*time),
-                            prev,
-                            lap
-                        );
-                    },
-                    RaceEvent::FastestLap { id, lap, time, .. } => {
-                        let driver = world
-                            .read()
-                            .entrant(*id)
-                            .and_then(|e| e.drivers.last().map(|d| d.pname.clone()))
-                            .unwrap_or_else(|| "?".to_string());
-                        println!("[FL] {:<20}  {}  lap {}", driver, fmt_duration(*time), lap);
-                    },
-                    // Each confirmed result classifies one more driver. Reprint the
-                    // table so it builds up live as drivers cross the line; the
-                    // final copy is printed on session end.
-                    RaceEvent::ResultConfirmed {
-                        result_num,
-                        num_results,
-                        ..
-                    } => {
-                        print_results(
-                            &world.read(),
-                            &format!("Results ({}/{} classified)", result_num + 1, num_results),
-                        );
-                    },
-                    _ => tracing::debug!(?e, "race event"),
-                }
-            },
-            _ => {},
+    loop {
+        let packet = session.read().await?;
+        let Applied { events, requests } = world.apply(&packet);
+        for request in requests {
+            session.write(request).await?;
+        }
+        for event in events {
+            on_event(&world, event);
         }
     }
-    // The world's events end with the session.
-    driver.await.expect("driver panicked")
+}
+
+fn on_event(world: &World, event: WorldEvent) {
+    match event {
+        WorldEvent::SessionStarted(SessionStarted { kind }) => {
+            tracing::info!(?kind, "session started");
+        },
+        WorldEvent::SessionEnded(SessionEnded) => {
+            tracing::info!("session ended");
+            print_results(world, "Final Race Results");
+        },
+        WorldEvent::Race(ref e) => {
+            match e {
+                RaceEvent::PersonalBest {
+                    id,
+                    lap,
+                    time,
+                    previous,
+                    ..
+                } => {
+                    let driver = world
+                        .entrant(*id)
+                        .and_then(|e| e.drivers.last().map(|d| d.pname.clone()))
+                        .unwrap_or_else(|| "?".to_string());
+                    let prev = previous
+                        .map(|p| format!(" (was {})", fmt_duration(p)))
+                        .unwrap_or_default();
+                    println!(
+                        "[PB] {:<20}  {}{}  lap {}",
+                        driver,
+                        fmt_duration(*time),
+                        prev,
+                        lap
+                    );
+                },
+                RaceEvent::FastestLap { id, lap, time, .. } => {
+                    let driver = world
+                        .entrant(*id)
+                        .and_then(|e| e.drivers.last().map(|d| d.pname.clone()))
+                        .unwrap_or_else(|| "?".to_string());
+                    println!("[FL] {:<20}  {}  lap {}", driver, fmt_duration(*time), lap);
+                },
+                // Each confirmed result classifies one more driver. Reprint the
+                // table so it builds up live as drivers cross the line; the
+                // final copy is printed on session end.
+                RaceEvent::ResultConfirmed {
+                    result_num,
+                    num_results,
+                    ..
+                } => {
+                    print_results(
+                        world,
+                        &format!("Results ({}/{} classified)", result_num + 1, num_results),
+                    );
+                },
+                _ => tracing::debug!(?e, "race event"),
+            }
+        },
+        _ => {},
+    }
 }
 
 fn fmt_duration(d: std::time::Duration) -> String {

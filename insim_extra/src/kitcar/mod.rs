@@ -77,7 +77,6 @@ pub mod host;
 pub mod input;
 pub mod service;
 pub mod services;
-mod timers;
 
 pub use effects::Effects;
 pub use host::Host;

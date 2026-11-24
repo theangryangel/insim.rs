@@ -1,7 +1,6 @@
 //! The `!rank` card: one driver's standing, as it was when they opened it.
 
-use insim::insim::BtnStyle;
-use insim_extra::ui::{self, Component, Node, Ui};
+use insim_extra::ui::{self, Component, Effects, Node, Ui};
 
 use crate::zinc::Zinc;
 
@@ -48,42 +47,39 @@ impl Component for RankCard {
     type Out = ();
     type Props<'a> = (&'a Zinc, &'a str);
 
-    fn mounted(&mut self, (zinc, uname): &(&Zinc, &str)) {
+    fn mounted(&mut self, (zinc, uname): &(&Zinc, &str)) -> Effects<Close> {
         self.standing = Some(Standing::of(zinc, uname));
+        Effects::none()
     }
 
-    fn update(&mut self, Close: Close) -> Option<()> {
-        Some(())
+    fn update(&mut self, Close: Close) -> Effects<Close> {
+        Effects::new().emit(())
     }
 
     fn render(&self, _: (&Zinc, &str), _: &mut Ui<'_, Close>) -> Node<Close> {
         let Some(standing) = &self.standing else {
             return ui::empty();
         };
-        let style = BtnStyle::default().dark();
         let position = match standing.position {
             Some(position) => format!("^7#{position} ^8of {}", standing.of),
             None => "^8Unranked - finish a race cleanly".to_string(),
         };
-        ui::col([
-            ui::text("^3Your rank", style).w(40).h(6),
-            ui::text(position, style).w(40).h(5),
-            ui::text(
-                format!(
-                    "^2{} point(s)^7, ^3{} yellow(s)^7, ^3{} collision(s)",
-                    standing.points, standing.yellows, standing.collisions
-                ),
-                style,
-            )
-            .w(40)
-            .h(5),
-            ui::text(format!("^7Cars: ^3{}", standing.cars), style)
-                .w(40)
-                .h(5),
-            ui::clickable("Close", style, Close).w(40).h(5),
-        ])
-        .position_absolute()
-        .top(60)
-        .left(80)
+        ui::components::dialog("Your rank")
+            .width(48)
+            .line(position)
+            .line(format!(
+                "^2{} point(s)^7, ^3{} yellow(s)^7, ^3{} collision(s)",
+                standing.points, standing.yellows, standing.collisions
+            ))
+            .line(format!("^7Cars: ^3{}", standing.cars))
+            .button(ui::clickable(
+                "Close",
+                ui::components::style::action(),
+                Close,
+            ))
+            .build()
+            .position_absolute()
+            .top(60)
+            .left(76)
     }
 }

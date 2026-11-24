@@ -223,8 +223,8 @@ pub enum WorldEvent {
     VersionReceived(VersionReceived),
     /// Something happened in the race: a lap, a pit stop, a finish.
     Race(RaceEvent),
-    /// Every reply to [`World::STARTUP_REQUESTS`](crate::world::World::STARTUP_REQUESTS)
-    /// is in. `apply` never emits this; whatever drives the world does
-    /// (`World::attach`, or kitcar's runtime).
+    /// Every reply to [`World::startup`](crate::world::World::startup) is in,
+    /// so the world knows what was there before you connected. Reported once,
+    /// when the startup ping's reply arrives.
     Ready(WorldReady),
 }

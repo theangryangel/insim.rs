@@ -59,9 +59,9 @@ impl Component for ClickCounter {
     type Out = u32;
     type Props<'a> = ();
 
-    fn update(&mut self, Clicked: Clicked) -> Option<u32> {
+    fn update(&mut self, Clicked: Clicked) -> ui::Effects<Clicked, u32> {
         self.clicks += 1;
-        Some(self.clicks)
+        ui::Effects::new().emit(self.clicks)
     }
 
     fn render(&self, (): (), _: &mut Ui<'_, Clicked>) -> Node<Clicked> {
@@ -94,34 +94,31 @@ impl Component for HelpDialog {
     type Out = ();
     type Props<'a> = ();
 
-    fn update(&mut self, msg: DialogMsg) -> Option<()> {
+    fn update(&mut self, msg: DialogMsg) -> ui::Effects<DialogMsg> {
         self.open = matches!(msg, DialogMsg::Show);
-        None
+        ui::Effects::none()
     }
 
     fn render(&self, (): (), _: &mut Ui<'_, DialogMsg>) -> Node<DialogMsg> {
         if !self.open {
             return ui::empty();
         }
-        ui::col([
-            ui::text("^3Commands", BtnStyle::default().dark())
-                .w(50)
-                .h(6),
-            ui::col(Cmd::COMMANDS.iter().map(|cmd| {
-                ui::text(
-                    format!("^7!{cmd} ^8- {}", cmd.help()),
-                    BtnStyle::default().dark().align_left(),
-                )
-                .w(50)
-                .h(5)
-            })),
-            ui::clickable("Close", BtnStyle::default().dark(), DialogMsg::Close)
-                .w(50)
-                .h(5),
-        ])
-        .position_absolute()
-        .top(60)
-        .left(75)
+        ui::components::dialog("Commands")
+            .width(54)
+            .lines(
+                Cmd::COMMANDS
+                    .iter()
+                    .map(|cmd| format!("^7!{cmd} ^8- {}", cmd.help())),
+            )
+            .button(ui::clickable(
+                "Close",
+                ui::components::style::action(),
+                DialogMsg::Close,
+            ))
+            .build()
+            .position_absolute()
+            .top(60)
+            .left(73)
     }
 }
 

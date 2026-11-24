@@ -7,6 +7,11 @@
 //! only while it keeps being placed. Clicks on its buttons go straight to it, and
 //! [`Child::on`] turns what it reports ([`Component::Out`]) into a message for
 //! its parent.
+//!
+//! A component can also start work of its own, returned as [`Effects`] from
+//! [`Component::mounted`] and [`Component::update`]: timers, tasks and streams
+//! whose messages come back to it. They run on Tokio, report through the
+//! screen's [`Outbox`], and are aborted when the instance unmounts.
 
 use std::{
     any::{Any, TypeId},
@@ -24,8 +29,10 @@ use insim::{
     identifiers::ConnectionId,
     insim::{BfnType, Btc, Btt},
 };
+use tokio::sync::mpsc;
 
-use super::{Action, Canvas, CanvasDiff, Node, id_pool::ClickIdPool};
+use super::{Action, Canvas, CanvasDiff, Effects, Node, id_pool::ClickIdPool};
+use crate::timers::{self, Job, JobId, Timers};
 
 /// A piece of UI with its own state, kept per player.
 ///
@@ -36,9 +43,9 @@ use super::{Action, Canvas, CanvasDiff, Node, id_pool::ClickIdPool};
 ///     type Msg = DialogMsg;     // its buttons' messages
 ///     type Out = ();            // nothing to report to its parent
 ///     type Props<'a> = ();      // no data from its parent
-///     fn update(&mut self, msg: DialogMsg) -> Option<()> {
+///     fn update(&mut self, msg: DialogMsg) -> Effects<DialogMsg> {
 ///         self.open = matches!(msg, DialogMsg::Show);
-///         None
+///         Effects::none()
 ///     }
 ///     fn render(&self, _: (), _: &mut Ui<'_, DialogMsg>) -> Node<DialogMsg> { /* ... */ }
 /// }
@@ -53,19 +60,23 @@ pub trait Component: Send + 'static {
     type Props<'a>;
 
     /// Runs once, before the first render, with the first props. `init` never
-    /// sees props, so set up from them here. Placed again after being dropped,
-    /// it mounts afresh.
-    fn mounted(&mut self, props: &Self::Props<'_>) {
+    /// sees props, so set up from them here, and start any loading: a task
+    /// returned here delivers its result to [`update`](Self::update). Placed
+    /// again after being dropped, it mounts afresh.
+    fn mounted(&mut self, props: &Self::Props<'_>) -> Effects<Self::Msg, Self::Out> {
         let _ = props;
+        Effects::none()
     }
 
     /// Runs once when it is dropped: not placed in a render, replaced by a
     /// different component, or its screen cleared (the player left, or the
-    /// service stopped).
+    /// service stopped). Its timers and tasks are aborted.
     fn unmounted(&mut self) {}
 
-    /// Handle one of its messages, optionally reporting to the parent.
-    fn update(&mut self, msg: Self::Msg) -> Option<Self::Out>;
+    /// Handle one of its messages: a click on its buttons, or the result of a
+    /// timer or task it started. Returns more work, and anything to report to
+    /// the parent with [`Effects::emit`].
+    fn update(&mut self, msg: Self::Msg) -> Effects<Self::Msg, Self::Out>;
 
     /// Draw it, placing any nested components with `ui`.
     fn render(&self, props: Self::Props<'_>, ui: &mut Ui<'_, Self::Msg>) -> Node<Self::Msg>;
@@ -99,6 +110,82 @@ impl<T: Any + Send + Sync + fmt::Debug + Hash + PartialEq> Key for T {
 
 type AnyMsg = Box<dyn Any + Send>;
 type OnOut = Arc<dyn Fn(AnyMsg) -> Option<AnyMsg> + Send + Sync>;
+
+/// A timer, task or stream result from a component, on its way back to the
+/// [`Screen`] that holds it. Hand it to [`Screen::deliver`].
+pub struct Delivery {
+    ucid: ConnectionId,
+    path: u64,
+    job: JobId,
+    msg: AnyMsg,
+}
+
+impl fmt::Debug for Delivery {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Delivery")
+            .field("ucid", &self.ucid)
+            .field("path", &self.path)
+            .field("job", &self.job)
+            .finish_non_exhaustive()
+    }
+}
+
+impl Delivery {
+    /// The connection whose screen it is for.
+    pub fn ucid(&self) -> ConnectionId {
+        self.ucid
+    }
+}
+
+/// Where components' timers and tasks send their results, for whoever drives
+/// the screens to pass back with [`Screen::deliver`]. kitcar's `Host` gives
+/// every screen one. Driving screens yourself, use [`Outbox::channel`].
+#[derive(Clone)]
+pub struct Outbox(Arc<dyn Fn(Delivery) -> bool + Send + Sync>);
+
+impl fmt::Debug for Outbox {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("Outbox")
+    }
+}
+
+impl Outbox {
+    /// Send each delivery through `send`, which returns false once nobody is
+    /// listening.
+    pub fn new(send: impl Fn(Delivery) -> bool + Send + Sync + 'static) -> Self {
+        Self(Arc::new(send))
+    }
+    /// An outbox and the receiver its deliveries arrive on.
+    pub fn channel() -> (Self, mpsc::UnboundedReceiver<Delivery>) {
+        let (tx, rx) = mpsc::unbounded_channel();
+        (Self::new(move |delivery| tx.send(delivery).is_ok()), rx)
+    }
+}
+
+/// A component's effects with its types erased.
+struct Work {
+    jobs: Vec<Job<AnyMsg>>,
+    emits: Vec<AnyMsg>,
+}
+
+impl Work {
+    fn erase<C: Component>(effects: Effects<C::Msg, C::Out>) -> Self {
+        let boxed: Arc<dyn Fn(C::Msg) -> AnyMsg + Send + Sync> =
+            Arc::new(|msg| Box::new(msg) as AnyMsg);
+        Self {
+            jobs: effects
+                .jobs
+                .into_iter()
+                .map(|job| job.map(boxed.clone()))
+                .collect(),
+            emits: effects
+                .emits
+                .into_iter()
+                .map(|out| Box::new(out) as AnyMsg)
+                .collect(),
+        }
+    }
+}
 
 /// How to place a component: its constructor, props, key and parent mapping.
 #[must_use = "place it with Ui::child"]
@@ -162,7 +249,8 @@ impl<'p, C: Component, M> Child<'p, C, M> {
 
 trait Erased: Send {
     fn as_any(&self) -> &dyn Any;
-    fn update_any(&mut self, msg: &dyn Any) -> Option<AnyMsg>;
+    /// `None` if `msg` isn't one of its messages.
+    fn update_any(&mut self, msg: &dyn Any) -> Option<Work>;
     fn unmounted(&mut self);
 }
 impl<C: Component> Erased for C {
@@ -172,9 +260,9 @@ impl<C: Component> Erased for C {
     fn unmounted(&mut self) {
         Component::unmounted(self);
     }
-    fn update_any(&mut self, msg: &dyn Any) -> Option<AnyMsg> {
+    fn update_any(&mut self, msg: &dyn Any) -> Option<Work> {
         let msg = msg.downcast_ref::<C::Msg>()?.clone();
-        self.update(msg).map(|out| Box::new(out) as AnyMsg)
+        Some(Work::erase::<C>(self.update(msg)))
     }
 }
 
@@ -184,9 +272,12 @@ struct Instance {
     key: Option<Box<dyn Key>>,
     on: Option<OnOut>,
     seen: u64,
+    /// Started on its first timer or task.
+    timers: Option<Timers<AnyMsg>>,
 }
 
-/// Every unmount ends here: unplaced, replaced, or its screen cleared or dropped.
+/// Every unmount ends here: unplaced, replaced, or its screen cleared or
+/// dropped. Its timers and tasks are aborted with it.
 impl Drop for Instance {
     fn drop(&mut self) {
         self.component.unmounted();
@@ -196,31 +287,92 @@ impl Drop for Instance {
 /// The view itself, rather than a component.
 const ROOT: u64 = 0;
 
-#[derive(Default)]
 struct Store {
+    ucid: ConnectionId,
+    outbox: Option<Outbox>,
     instances: HashMap<u64, Instance>,
     generation: u64,
     /// The earliest redraw asked for during the last render.
     redraw_at: Option<Instant>,
+    /// What components returned from `mounted` during this render, carried
+    /// out once it's done and every instance is in place.
+    mounting: Vec<(u64, Work)>,
 }
 
 impl Store {
-    /// Deliver `msg` to an instance and pass what it reports up through its
-    /// parents. Returns the root's message, if it gets that far.
-    fn deliver(&mut self, mut path: u64, msg: &dyn Any) -> Option<AnyMsg> {
-        let mut out = self.instances.get_mut(&path)?.component.update_any(msg)?;
-        loop {
-            let instance = self.instances.get(&path)?;
-            let mapped = (instance.on.as_ref()?)(out)?;
-            if instance.parent == ROOT {
-                return Some(mapped);
+    fn new(ucid: ConnectionId, outbox: Option<Outbox>) -> Self {
+        Self {
+            ucid,
+            outbox,
+            instances: HashMap::new(),
+            generation: 0,
+            redraw_at: None,
+            mounting: Vec::new(),
+        }
+    }
+
+    /// Deliver `msg` to an instance and carry out its effects. Returns the
+    /// messages that reach the view.
+    fn deliver(&mut self, path: u64, msg: &dyn Any) -> Vec<AnyMsg> {
+        let Some(work) = self
+            .instances
+            .get_mut(&path)
+            .and_then(|instance| instance.component.update_any(msg))
+        else {
+            return Vec::new();
+        };
+        self.apply(path, work)
+    }
+
+    /// Start an instance's work, and pass what it reports up to its parent,
+    /// whose own update may report further. Returns the messages that reach
+    /// the view.
+    fn apply(&mut self, path: u64, work: Work) -> Vec<AnyMsg> {
+        let Some(instance) = self.instances.get_mut(&path) else {
+            return Vec::new();
+        };
+        if !work.jobs.is_empty() {
+            match (&mut instance.timers, &self.outbox) {
+                (Some(timers), _) => Self::run(timers, work.jobs),
+                (None, Some(outbox)) => {
+                    let (outbox, ucid) = (outbox.clone(), self.ucid);
+                    let timers = instance
+                        .timers
+                        .insert(Timers::new(Arc::new(move |job, msg| {
+                            (outbox.0)(Delivery {
+                                ucid,
+                                path,
+                                job,
+                                msg,
+                            })
+                        })));
+                    Self::run(timers, work.jobs);
+                },
+                (None, None) => tracing::warn!(
+                    ucid = %self.ucid,
+                    "a component started a timer or task on a screen with no outbox; dropped"
+                ),
             }
-            path = instance.parent;
-            out = self
-                .instances
-                .get_mut(&path)?
-                .component
-                .update_any(&*mapped)?;
+        }
+        let (parent, on) = (instance.parent, instance.on.clone());
+        let mut root = Vec::new();
+        for out in work.emits {
+            let Some(mapped) = on.as_ref().and_then(|on| on(out)) else {
+                continue;
+            };
+            if parent == ROOT {
+                root.push(mapped);
+            } else {
+                root.extend(self.deliver(parent, &*mapped));
+            }
+        }
+        root
+    }
+
+    fn run(timers: &mut Timers<AnyMsg>, jobs: Vec<Job<AnyMsg>>) {
+        let now = timers::now();
+        for job in jobs {
+            timers.run(job, now);
         }
     }
 }
@@ -329,13 +481,17 @@ impl<M> Ui<'_, M> {
                     );
                 }
                 let mut component = (child.init)();
-                component.mounted(&child.props);
+                let work = Work::erase::<C>(component.mounted(&child.props));
+                if !work.jobs.is_empty() || !work.emits.is_empty() {
+                    self.store.mounting.push((id, work));
+                }
                 Instance {
                     component: Box::new(component),
                     parent: self.owner,
                     key: None,
                     on: None,
                     seen: generation,
+                    timers: None,
                 }
             },
         };
@@ -373,6 +529,8 @@ pub struct Screen<M: Clone + 'static> {
     store: Store,
     hidden: bool,
     dirty: bool,
+    /// Messages for the view from components reporting as they mounted.
+    raised: Vec<M>,
 }
 
 impl<M: Clone + 'static> fmt::Debug for Screen<M> {
@@ -386,14 +544,26 @@ impl<M: Clone + 'static> fmt::Debug for Screen<M> {
 }
 
 impl<M: Clone + Send + 'static> Screen<M> {
-    /// A screen for `ucid` with nothing drawn yet.
+    /// A screen for `ucid` with nothing drawn yet, and no outbox: components
+    /// on it can't start timers or tasks. See [`with_outbox`](Self::with_outbox).
     pub fn new(ucid: ConnectionId) -> Self {
+        Self::build(ucid, None)
+    }
+
+    /// A screen whose components' timers and tasks report to `outbox`. Pass
+    /// each [`Delivery`] back with [`deliver`](Self::deliver).
+    pub fn with_outbox(ucid: ConnectionId, outbox: Outbox) -> Self {
+        Self::build(ucid, Some(outbox))
+    }
+
+    fn build(ucid: ConnectionId, outbox: Option<Outbox>) -> Self {
         Self {
             ucid,
             canvas: Canvas::new(ucid),
-            store: Store::default(),
+            store: Store::new(ucid, outbox),
             hidden: false,
             dirty: true,
+            raised: Vec::new(),
         }
     }
 
@@ -438,6 +608,12 @@ impl<M: Clone + Send + 'static> Screen<M> {
         self.store
             .instances
             .retain(|_, instance| instance.seen == generation);
+        for (path, work) in std::mem::take(&mut self.store.mounting) {
+            // Reporting may change a parent's state, so draw again.
+            self.dirty |= !work.emits.is_empty();
+            let raised = Self::root(self.store.apply(path, work));
+            self.raised.extend(raised);
+        }
         self.canvas
             .reconcile_in(node.unwrap_or_else(Node::empty), pool)
             .map(CanvasDiff::merge)
@@ -484,6 +660,30 @@ impl<M: Clone + Send + 'static> Screen<M> {
         }
     }
 
+    /// Hand a component the result of one of its timers or tasks, and return
+    /// any messages for the view. Dropped if the component has since
+    /// unmounted, or replaced or cancelled the work that sent it.
+    pub fn deliver(&mut self, delivery: Delivery) -> Vec<M> {
+        let accepted = delivery.ucid == self.ucid
+            && self
+                .store
+                .instances
+                .get_mut(&delivery.path)
+                .and_then(|instance| instance.timers.as_mut())
+                .is_some_and(|timers| timers.accept(delivery.job));
+        if !accepted {
+            return Vec::new();
+        }
+        self.dirty = true;
+        Self::root(self.store.deliver(delivery.path, &*delivery.msg))
+    }
+
+    /// Messages for the view from components that reported as they mounted
+    /// during the last render.
+    pub fn take_messages(&mut self) -> Vec<M> {
+        std::mem::take(&mut self.raised)
+    }
+
     /// Send `msg` to every component placed with `key`, as if from one of its
     /// buttons, and return any messages for the view. If none is placed, `msg` is
     /// dropped with a warning.
@@ -506,10 +706,10 @@ impl<M: Clone + Send + 'static> Screen<M> {
         msgs
     }
 
-    fn root(msg: Option<AnyMsg>) -> Vec<M> {
-        msg.and_then(|msg| msg.downcast::<M>().ok())
-            .map(|msg| vec![*msg])
-            .unwrap_or_default()
+    fn root(msgs: Vec<AnyMsg>) -> Vec<M> {
+        msgs.into_iter()
+            .filter_map(|msg| msg.downcast::<M>().ok().map(|msg| *msg))
+            .collect()
     }
 
     /// Remove every button and component, releasing their click ids. Returns the
@@ -545,13 +745,13 @@ mod tests {
         type Msg = ConfirmMsg;
         type Out = bool;
         type Props<'a> = &'a str;
-        fn update(&mut self, msg: ConfirmMsg) -> Option<bool> {
+        fn update(&mut self, msg: ConfirmMsg) -> Effects<ConfirmMsg, bool> {
             match msg {
                 ConfirmMsg::Toggle => {
                     self.open = !self.open;
-                    None
+                    Effects::none()
                 },
-                ConfirmMsg::Yes => Some(true),
+                ConfirmMsg::Yes => Effects::new().emit(true),
             }
         }
         fn render(&self, label: &str, _: &mut Ui<'_, ConfirmMsg>) -> Node<ConfirmMsg> {
@@ -581,8 +781,8 @@ mod tests {
         type Msg = PanelMsg;
         type Out = &'static str;
         type Props<'a> = ();
-        fn update(&mut self, PanelMsg::Confirmed: PanelMsg) -> Option<&'static str> {
-            Some("cleared")
+        fn update(&mut self, PanelMsg::Confirmed: PanelMsg) -> Effects<PanelMsg, &'static str> {
+            Effects::new().emit("cleared")
         }
         fn render(&self, (): (), ui: &mut Ui<'_, PanelMsg>) -> Node<PanelMsg> {
             ui.child(
@@ -690,19 +890,20 @@ mod tests {
         type Msg = ();
         type Out = ();
         type Props<'a> = u32;
-        fn mounted(&mut self, props: &u32) {
+        fn mounted(&mut self, props: &u32) -> Effects<()> {
             self.taken = *props;
             let _ = self
                 .mounts
                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            Effects::none()
         }
         fn unmounted(&mut self) {
             let _ = self
                 .unmounts
                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         }
-        fn update(&mut self, (): ()) -> Option<()> {
-            None
+        fn update(&mut self, (): ()) -> Effects<()> {
+            Effects::none()
         }
         fn render(&self, live: u32, _: &mut Ui<'_, ()>) -> Node<()> {
             Node::text(format!("{} {live}", self.taken), BtnStyle::default())
@@ -754,6 +955,137 @@ mod tests {
         // Clearing the screen (the player left, or the service stopped) unmounts too.
         let _ = screen.clear(&mut pool);
         assert_eq!(unmounts.load(Ordering::Relaxed), 2);
+    }
+
+    /// Loads on mount, then closes itself a while after.
+    struct Board {
+        rows: Option<u32>,
+    }
+    #[derive(Clone, Debug, PartialEq)]
+    enum BoardMsg {
+        Loaded(u32),
+        Close,
+    }
+    #[derive(Debug, PartialEq)]
+    struct CloseLater;
+    impl Component for Board {
+        type Msg = BoardMsg;
+        type Out = &'static str;
+        type Props<'a> = ();
+        fn mounted(&mut self, (): &()) -> Effects<BoardMsg, &'static str> {
+            Effects::new().task(async {
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                BoardMsg::Loaded(7)
+            })
+        }
+        fn update(&mut self, msg: BoardMsg) -> Effects<BoardMsg, &'static str> {
+            match msg {
+                BoardMsg::Loaded(rows) => {
+                    self.rows = Some(rows);
+                    Effects::new().schedule_after(
+                        CloseLater,
+                        Duration::from_secs(5),
+                        BoardMsg::Close,
+                    )
+                },
+                BoardMsg::Close => Effects::new().emit("closed"),
+            }
+        }
+        fn render(&self, (): (), _: &mut Ui<'_, BoardMsg>) -> Node<BoardMsg> {
+            let text = match self.rows {
+                Some(rows) => format!("{rows} rows"),
+                None => "loading".to_string(),
+            };
+            Node::text(text, BtnStyle::default()).w(20).h(5)
+        }
+    }
+
+    fn board(shown: bool) -> impl FnOnce(&mut Ui<'_, Root>) -> Option<Node<Root>> {
+        move |ui| shown.then(|| ui.child(Child::new(|| Board { rows: None }).on(Root::Done)))
+    }
+
+    /// The next delivery, waiting as long as it takes on the paused clock.
+    async fn delivery(rx: &mut mpsc::UnboundedReceiver<Delivery>) -> Delivery {
+        rx.recv().await.expect("the screen holds the outbox")
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn components_load_on_mount_and_act_on_their_own_timers() {
+        let (outbox, mut rx) = Outbox::channel();
+        let mut pool = ClickIdPool::new();
+        let mut screen = Screen::<Root>::with_outbox(ConnectionId(3), outbox);
+
+        let drawn = texts(&screen.render(&mut pool, timers::now(), board(true)));
+        assert_eq!(drawn[0].1, "loading");
+
+        // The task's result comes back to the component, which redraws.
+        let loaded = delivery(&mut rx).await;
+        assert!(screen.deliver(loaded).is_empty());
+        assert!(screen.is_dirty());
+        let redrawn = texts(&screen.render(&mut pool, timers::now(), board(true)));
+        assert_eq!(redrawn[0].1, "7 rows");
+
+        // Its timer fires five seconds later, and what it reports reaches the
+        // view.
+        let started = tokio::time::Instant::now();
+        let close = delivery(&mut rx).await;
+        assert_eq!(started.elapsed(), Duration::from_secs(5));
+        assert_eq!(screen.deliver(close), [Root::Done("closed")]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn unmounting_aborts_a_components_work() {
+        let (outbox, mut rx) = Outbox::channel();
+        let mut pool = ClickIdPool::new();
+        let mut screen = Screen::<Root>::with_outbox(ConnectionId(3), outbox);
+
+        let _ = screen.render(&mut pool, timers::now(), board(true));
+        // Unplaced before its load finishes: the load is aborted.
+        let _ = screen.render(&mut pool, timers::now(), board(false));
+        let waited = tokio::time::timeout(Duration::from_secs(60), rx.recv()).await;
+        assert!(waited.is_err(), "an unmounted component's task reported");
+
+        // Placed again, it mounts afresh and loads again.
+        let _ = screen.render(&mut pool, timers::now(), board(true));
+        let loaded = delivery(&mut rx).await;
+        assert!(screen.deliver(loaded).is_empty());
+        let redrawn = texts(&screen.render(&mut pool, timers::now(), board(true)));
+        assert_eq!(redrawn[0].1, "7 rows");
+
+        // A result for an instance that has since gone is dropped.
+        let close = delivery(&mut rx).await;
+        let _ = screen.render(&mut pool, timers::now(), board(false));
+        assert!(screen.deliver(close).is_empty());
+    }
+
+    /// Reports as soon as it mounts.
+    struct Greeter;
+    impl Component for Greeter {
+        type Msg = ();
+        type Out = &'static str;
+        type Props<'a> = ();
+        fn mounted(&mut self, (): &()) -> Effects<(), &'static str> {
+            Effects::new().emit("hello")
+        }
+        fn update(&mut self, (): ()) -> Effects<(), &'static str> {
+            Effects::none()
+        }
+        fn render(&self, (): (), _: &mut Ui<'_, ()>) -> Node<()> {
+            Node::empty()
+        }
+    }
+
+    #[test]
+    fn reports_from_mounting_reach_the_view_after_the_render() {
+        let mut pool = ClickIdPool::new();
+        let mut screen = Screen::<Root>::new(ConnectionId(3));
+        let view = |ui: &mut Ui<'_, Root>| Some(ui.child(Child::new(|| Greeter).on(Root::Done)));
+        let _ = screen.render(&mut pool, Instant::now(), view);
+        assert_eq!(screen.take_messages(), [Root::Done("hello")]);
+        assert!(screen.is_dirty());
+        // Only once: it's already mounted.
+        let _ = screen.render(&mut pool, Instant::now(), view);
+        assert!(screen.take_messages().is_empty());
     }
 
     #[test]

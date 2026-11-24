@@ -11,7 +11,7 @@ use insim::{
 };
 use tokio::{
     sync::{mpsc, oneshot},
-    task::{AbortHandle, JoinHandle},
+    task::JoinHandle,
 };
 
 use crate::{
@@ -21,9 +21,10 @@ use crate::{
         effects::Effect,
         error::HostError,
         service::{AnyMsg, Context, ErasedService, Input, Pools, Service, Typed},
-        timers::Timers,
     },
-    world::{Applied, SharedWorld, World, WorldEvent, event::WorldReady},
+    timers::{self, JobId, Timers},
+    ui::{Delivery, Outbox},
+    world::{Applied, World},
 };
 
 /// Bound on the outgoing queue and on packets waiting for the host.
@@ -31,6 +32,14 @@ const CAPACITY: usize = 256;
 
 /// Buttons are redrawn at most this often, however fast inputs arrive.
 const FRAME: Duration = Duration::from_millis(50);
+
+/// A message from work the host started, on its way back.
+enum Fired {
+    /// From a service's or the director's own timers and tasks.
+    Job { owner: u64, job: JobId, msg: AnyMsg },
+    /// From a component on one of a service's screens.
+    Ui { owner: u64, delivery: Delivery },
+}
 
 enum Command {
     Start {
@@ -54,7 +63,8 @@ enum Command {
 /// Owns one LFS connection and runs [`Service`]s on it.
 ///
 /// Each packet updates the [`World`] before any service sees it. On start, the
-/// host requests the server's state, then delivers [`WorldEvent::Ready`].
+/// host requests the server's state, then delivers
+/// [`WorldEvent::Ready`](crate::world::WorldEvent::Ready).
 /// Services start and stop without reconnecting, which is how a server manager
 /// rotates games:
 ///
@@ -76,7 +86,6 @@ enum Command {
 pub struct Host {
     commands: mpsc::Sender<Command>,
     sender: net::Sender,
-    world: SharedWorld,
     task: Option<JoinHandle<Result<(), HostError>>>,
 }
 
@@ -89,27 +98,21 @@ impl Host {
     /// Like [`spawn`](Self::spawn), with a configured world such as
     /// [`World::with_rejoin`].
     pub fn spawn_with(session: Session<Tokio>, world: World) -> Self {
-        let world = SharedWorld::new(world);
         let (sender, receiver, driver) = session.into_split(CAPACITY);
         let driver = tokio::spawn(driver);
         let (commands, command_rx) = mpsc::channel(16);
         let (results_tx, results_rx) = mpsc::unbounded_channel();
-        let startup = {
-            let sender = sender.clone();
-            tokio::spawn(async move { World::request_startup(&sender).await })
-        };
         let host = Loop {
             connection: sender.clone(),
             receiver,
-            world: world.clone(),
+            world,
             director: None,
             commands: Vec::new(),
             services: Vec::new(),
             results_tx,
-            ready: Ready::new(startup),
             next_id: 0,
             pools: Pools::new(),
-            last_render: Instant::now(),
+            last_render: timers::now(),
         };
         let task = tokio::spawn(async move {
             let result = host.run(command_rx, results_rx).await;
@@ -123,20 +126,13 @@ impl Host {
         Self {
             commands,
             sender,
-            world,
             task: Some(task),
         }
     }
 
-    /// The connection, for work outside a service, such as attaching a UI
-    /// before starting the service that owns it.
+    /// The connection, for work outside a service.
     pub fn sender(&self) -> &net::Sender {
         &self.sender
-    }
-
-    /// The server mirror.
-    pub fn world(&self) -> &SharedWorld {
-        &self.world
     }
 
     /// Start a service. It gets [`Input::Started`], then every input from then
@@ -242,29 +238,29 @@ impl ServiceHandle {
     }
 }
 
-/// Timers and tasks, kept for anything the host runs.
+/// Timers and tasks, kept for anything the host runs. Dropping it aborts
+/// them.
 struct Slot {
     id: u64,
     timers: Timers<AnyMsg>,
-    tasks: Vec<AbortHandle>,
     stopping: bool,
 }
 
 impl Slot {
-    fn new(id: u64) -> Self {
+    fn new(id: u64, results: &mpsc::UnboundedSender<Fired>) -> Self {
+        let results = results.clone();
         Self {
             id,
-            timers: Timers::default(),
-            tasks: Vec::new(),
+            timers: Timers::new(std::sync::Arc::new(move |job, msg| {
+                results
+                    .send(Fired::Job {
+                        owner: id,
+                        job,
+                        msg,
+                    })
+                    .is_ok()
+            })),
             stopping: false,
-        }
-    }
-}
-
-impl Drop for Slot {
-    fn drop(&mut self) {
-        for task in &self.tasks {
-            task.abort();
         }
     }
 }
@@ -299,13 +295,12 @@ enum Target {
 struct Loop {
     connection: net::Sender,
     receiver: net::Receiver,
-    world: SharedWorld,
+    world: World,
     director: Option<Directing>,
     /// Commands from services, for the director once their effects are done.
     commands: Vec<DirectorCommand>,
     services: Vec<Running>,
-    results_tx: mpsc::UnboundedSender<(u64, AnyMsg)>,
-    ready: Ready,
+    results_tx: mpsc::UnboundedSender<Fired>,
     next_id: u64,
     pools: Pools,
     last_render: Instant,
@@ -315,30 +310,30 @@ impl Loop {
     async fn run(
         mut self,
         mut commands: mpsc::Receiver<Command>,
-        mut results: mpsc::UnboundedReceiver<(u64, AnyMsg)>,
+        mut results: mpsc::UnboundedReceiver<Fired>,
     ) -> Result<(), HostError> {
+        // What was there before we connected. The world reports Ready once
+        // every reply is in.
+        for request in World::startup() {
+            if let Err(error) = self.connection.send(request).await {
+                tracing::warn!(%error, "failed to send a startup request");
+            }
+        }
         loop {
-            let deadline = self
-                .services
-                .iter()
-                .map(|m| &m.slot)
-                .chain(self.director.as_ref().map(|d| &d.slot))
-                .filter_map(|slot| slot.timers.deadline())
-                .min();
-            let waiting = self.ready.task.is_some();
-            let wake = match (deadline, self.render_at()) {
-                (Some(a), Some(b)) => Some(a.min(b)),
-                (a, b) => a.or(b),
-            };
+            let wake = self.render_at();
             tokio::select! {
                 biased;
                 command = commands.recv() => match command {
-                    Some(Command::Start { service, done, reply }) => {
+                    Some(Command::Start { mut service, done, reply }) => {
                         let id = self.next_id;
                         tracing::info!(service = service.name(), "service started");
                         self.next_id += 1;
+                        let results = self.results_tx.clone();
+                        service.set_outbox(Outbox::new(move |delivery| {
+                            results.send(Fired::Ui { owner: id, delivery }).is_ok()
+                        }));
                         self.services.push(Running {
-                            slot: Slot::new(id),
+                            slot: Slot::new(id, &self.results_tx),
                             service,
                             done: Some(done),
                         });
@@ -357,7 +352,7 @@ impl Loop {
                         let id = self.next_id;
                         self.next_id += 1;
                         self.director = Some(Directing {
-                            slot: Slot::new(id),
+                            slot: Slot::new(id, &self.results_tx),
                             director: *director,
                         });
                         let _ = reply.send(());
@@ -390,33 +385,29 @@ impl Loop {
                         return Ok(());
                     },
                 },
-                Some((id, msg)) = results.recv() => {
-                    if let Some(target) = self.target_of(id).filter(|&t| self.live(t)) {
-                        self.deliver(target, Input::Msg(msg)).await;
-                    }
-                },
-                () = tokio::time::sleep_until(wake.unwrap_or_else(Instant::now).into()), if wake.is_some() => {
-                    let now = Instant::now();
-                    for target in self.targets() {
-                        for msg in self.slot_mut(target).timers.expire(now) {
-                            if self.live(target) {
-                                self.deliver(target, Input::Msg(msg)).await;
-                            }
+                Some(fired) = results.recv() => match fired {
+                    Fired::Job { owner, job, msg } => {
+                        if let Some(target) = self.target_of(owner).filter(|&t| self.live(t))
+                            && self.slot_mut(target).timers.accept(job)
+                        {
+                            self.deliver(target, Input::Msg(msg)).await;
                         }
-                    }
+                    },
+                    Fired::Ui { owner, delivery } => {
+                        if let Some(index) = self.index_of(owner)
+                            && self.live(Target::Service(index))
+                        {
+                            self.deliver_ui(index, delivery).await;
+                        }
+                    },
                 },
-                replies = self.ready.replies(), if waiting => {
-                    if let Some(replies) = replies {
-                        self.ready.expect(&replies);
-                    }
-                },
-            }
-            if self.ready.take() && self.world.write().mark_ready() {
-                self.broadcast(|| Input::World(WorldEvent::Ready(WorldReady::default())))
-                    .await;
+                // Time for a frame; the render follows below.
+                () = tokio::time::sleep_until(
+                    tokio::time::Instant::from_std(wake.unwrap_or_else(timers::now)),
+                ), if wake.is_some() => {},
             }
             self.remove_stopped().await;
-            if self.render_at().is_some_and(|at| Instant::now() >= at) {
+            if self.render_at().is_some_and(|at| timers::now() >= at) {
                 self.render().await;
             }
         }
@@ -437,18 +428,41 @@ impl Loop {
     }
 
     async fn render(&mut self) {
-        let now = Instant::now();
+        let now = timers::now();
         self.last_render = now;
         let mut packets = Vec::new();
+        // What components reported as they mounted, for their services.
+        let mut raised = Vec::new();
         {
-            let world = self.world.read();
-            let cx = Context::new(&world, now)
+            let world = &self.world;
+            let cx = Context::new(world, now)
                 .with_director_opt(self.director.as_ref().map(|d| d.director.status()));
-            for running in &mut self.services {
-                packets.extend(running.service.render(&cx, &mut self.pools));
+            for (index, running) in self.services.iter_mut().enumerate() {
+                let (drawn, effects) = running.service.render(&cx, &mut self.pools);
+                packets.extend(drawn);
+                if !effects.is_empty() {
+                    raised.push((index, effects));
+                }
             }
         }
         self.send_all(packets).await;
+        for (index, effects) in raised {
+            self.apply(Target::Service(index), effects, now).await;
+        }
+        self.direct(now).await;
+    }
+
+    /// Hand a component's task or timer result to its screen.
+    async fn deliver_ui(&mut self, index: usize, delivery: Delivery) {
+        let now = timers::now();
+        let effects = {
+            let world = &self.world;
+            let cx = Context::new(world, now)
+                .with_director_opt(self.director.as_ref().map(|d| d.director.status()));
+            self.services[index].service.deliver(delivery, &cx)
+        };
+        self.apply(Target::Service(index), effects, now).await;
+        self.direct(now).await;
     }
 
     async fn send_all(&mut self, packets: Vec<Packet>) {
@@ -503,8 +517,7 @@ impl Loop {
     }
 
     async fn on_packet(&mut self, packet: Packet) {
-        self.ready.dispatched(&packet);
-        let Applied { events, requests } = self.world.write().apply(&packet);
+        let Applied { events, requests } = self.world.apply(&packet);
         // Requests the world needs to stay in step.
         for request in requests {
             if let Err(error) = self.connection.send(request).await {
@@ -530,19 +543,11 @@ impl Loop {
         }
     }
 
-    async fn broadcast(&mut self, input: impl Fn() -> Input<AnyMsg>) {
-        for target in self.targets() {
-            if self.live(target) {
-                self.deliver(target, input()).await;
-            }
-        }
-    }
-
     async fn deliver(&mut self, target: Target, input: Input<AnyMsg>) {
-        let now = Instant::now();
+        let now = timers::now();
         let effects = {
-            let world = self.world.read();
-            let cx = Context::new(&world, now);
+            let world = &self.world;
+            let cx = Context::new(world, now);
             match target {
                 Target::Director => {
                     let Some(directing) = self.director.as_mut() else {
@@ -578,8 +583,8 @@ impl Loop {
                 continue;
             }
             let effects = {
-                let world = self.world.read();
-                let cx = Context::new(&world, now);
+                let world = &self.world;
+                let cx = Context::new(world, now);
                 self.director
                     .as_mut()
                     .expect("checked live")
@@ -592,7 +597,6 @@ impl Loop {
     }
 
     async fn apply(&mut self, target: Target, effects: Effects<AnyMsg>, now: Instant) {
-        let id = self.slot_mut(target).id;
         let mut queue: VecDeque<_> = effects.items.into();
         while let Some(effect) = queue.pop_front() {
             match effect {
@@ -601,41 +605,15 @@ impl Loop {
                         tracing::warn!(%error, "failed to send a packet from a service");
                     }
                 },
-                Effect::Timer { key, when, msg } => {
-                    self.slot_mut(target)
-                        .timers
-                        .once(key, when.resolve(now), msg);
-                },
-                Effect::Every { key, period, make } => {
-                    self.slot_mut(target).timers.every(key, period, make, now);
-                },
-                Effect::Cancel(cancel) => self.slot_mut(target).timers.cancel(&cancel),
-                Effect::Task(task) => {
-                    let results = self.results_tx.clone();
-                    let handle = tokio::spawn(async move {
-                        let _ = results.send((id, task.await));
-                    });
-                    self.track(target, handle.abort_handle());
-                },
-                Effect::Stream(mut stream) => {
-                    let results = self.results_tx.clone();
-                    let handle = tokio::spawn(async move {
-                        while let Some(msg) = futures::StreamExt::next(&mut stream).await {
-                            if results.send((id, msg)).is_err() {
-                                break;
-                            }
-                        }
-                    });
-                    self.track(target, handle.abort_handle());
-                },
+                Effect::Job(job) => self.slot_mut(target).timers.run(job, now),
                 Effect::Send { ucid, key, msg } => {
                     // The director has no view, so nothing to send to.
                     let Target::Service(index) = target else {
                         continue;
                     };
                     let more = {
-                        let world = self.world.read();
-                        let cx = Context::new(&world, now)
+                        let world = &self.world;
+                        let cx = Context::new(world, now)
                             .with_director_opt(self.director.as_ref().map(|d| d.director.status()));
                         self.services[index].service.send(ucid, &*key, &*msg, &cx)
                     };
@@ -648,12 +626,6 @@ impl Loop {
                 Effect::Director(command) => self.commands.push(command),
             }
         }
-    }
-
-    fn track(&mut self, target: Target, task: AbortHandle) {
-        let tasks = &mut self.slot_mut(target).tasks;
-        tasks.retain(|t| !t.is_finished());
-        tasks.push(task);
     }
 
     async fn stop(&mut self, index: usize) {
@@ -703,64 +675,6 @@ impl Loop {
     }
 }
 
-/// Holds back [`WorldEvent::Ready`] until every startup reply is in the world.
-///
-/// A reply future resolves when its packets are *decoded*, which can be before
-/// the host has folded them. So the host counts folded packets per ReqI and
-/// compares them with the replies once known.
-struct Ready {
-    task: Option<JoinHandle<insim::Result<Vec<Packet>>>>,
-    seen: [usize; 256],
-    expected: Option<[usize; 256]>,
-}
-impl Ready {
-    fn new(task: JoinHandle<insim::Result<Vec<Packet>>>) -> Self {
-        Self {
-            task: Some(task),
-            seen: [0; 256],
-            expected: None,
-        }
-    }
-    fn dispatched(&mut self, packet: &Packet) {
-        if let Some(reqi) = packet.request_id() {
-            self.seen[usize::from(reqi.0)] += 1;
-        }
-    }
-    async fn replies(&mut self) -> Option<Vec<Packet>> {
-        let task = self.task.as_mut()?;
-        let result = task.await;
-        self.task = None;
-        match result {
-            Ok(Ok(replies)) => Some(replies),
-            Ok(Err(error)) => {
-                tracing::warn!(%error, "startup requests failed; WorldReady will not be delivered");
-                None
-            },
-            Err(error) => {
-                tracing::error!(%error, "startup request task panicked");
-                None
-            },
-        }
-    }
-    fn expect(&mut self, replies: &[Packet]) {
-        let mut expected = [0; 256];
-        for reqi in replies.iter().filter_map(Packet::request_id) {
-            expected[usize::from(reqi.0)] += 1;
-        }
-        self.expected = Some(expected);
-    }
-    /// True exactly once, when every startup reply is folded.
-    fn take(&mut self) -> bool {
-        let done = self
-            .expected
-            .is_some_and(|expected| expected.iter().zip(&self.seen).all(|(e, s)| s >= e));
-        if done {
-            self.expected = None;
-        }
-        done
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use insim::{
@@ -770,6 +684,7 @@ mod tests {
     };
 
     use super::*;
+    use crate::world::WorldEvent;
 
     #[derive(Debug, PartialEq)]
     struct TickKey;
@@ -814,7 +729,7 @@ mod tests {
         loop {
             match lfs.recv().await.expect("host closed the connection") {
                 Packet::Mtc(Mtc { text, .. }) => return text,
-                Packet::Tiny(Tiny { reqi, .. }) if reqi.0 >= 128 => {},
+                Packet::Tiny(Tiny { reqi, .. }) if reqi.0 != 0 => {},
                 other => panic!("unexpected {other:?}"),
             }
         }
@@ -825,12 +740,27 @@ mod tests {
         tokio::time::timeout(Duration::from_secs(10), async {
             let (session, mut lfs) = pair().await;
             let host = Host::spawn(session);
+            // The startup requests end with a ping.
+            let ping = loop {
+                if let Some(Packet::Tiny(Tiny {
+                    subt: TinyType::Ping,
+                    reqi,
+                })) = lfs.recv().await
+                {
+                    break reqi;
+                }
+            };
             let service = host.start(Probe("a")).await.unwrap();
 
             assert_eq!(line(&mut lfs).await, "a started");
             assert_eq!(line(&mut lfs).await, "a tick");
             assert_eq!(line(&mut lfs).await, "a loaded 7");
-            // No startup replies: Ready follows once the requests go quiet.
+            // Its reply means every startup reply is in.
+            lfs.send(Tiny {
+                subt: TinyType::Reply,
+                reqi: ping,
+            })
+            .await;
             assert_eq!(line(&mut lfs).await, "a ready true");
 
             service.stop().await;
@@ -1029,9 +959,9 @@ mod tests {
             type Msg = DialogMsg;
             type Out = ();
             type Props<'a> = ();
-            fn update(&mut self, msg: DialogMsg) -> Option<()> {
+            fn update(&mut self, msg: DialogMsg) -> crate::ui::Effects<DialogMsg> {
                 self.open = matches!(msg, DialogMsg::Show);
-                None
+                crate::ui::Effects::none()
             }
             fn render(&self, (): (), _: &mut Ui<'_, DialogMsg>) -> Node<DialogMsg> {
                 if self.open {
@@ -1096,7 +1026,7 @@ mod tests {
         async fn button(lfs: &mut Lfs) -> Packet {
             loop {
                 match lfs.recv().await.expect("host closed the connection") {
-                    Packet::Tiny(Tiny { reqi, .. }) if reqi.0 >= 128 => {},
+                    Packet::Tiny(Tiny { reqi, .. }) if reqi.0 != 0 => {},
                     packet @ (Packet::Btn(_) | Packet::Bfn(_)) => return packet,
                     other => panic!("unexpected {other:?}"),
                 }
@@ -1107,6 +1037,67 @@ mod tests {
                 Packet::Btn(btn) => btn,
                 other => panic!("expected a button, got {other:?}"),
             }
+        }
+
+        /// Loads its text as it mounts.
+        struct Loader {
+            text: &'static str,
+        }
+        impl Component for Loader {
+            type Msg = &'static str;
+            type Out = ();
+            type Props<'a> = ();
+            fn mounted(&mut self, (): &()) -> crate::ui::Effects<&'static str> {
+                crate::ui::Effects::new().task(async { "loaded" })
+            }
+            fn update(&mut self, text: &'static str) -> crate::ui::Effects<&'static str> {
+                self.text = text;
+                crate::ui::Effects::none()
+            }
+            fn render(&self, (): (), _: &mut Ui<'_, &'static str>) -> Node<&'static str> {
+                Node::text(self.text, BtnStyle::default()).w(30).h(5)
+            }
+        }
+
+        struct Loading;
+        impl Service for Loading {
+            type Msg = ();
+            fn update(&mut self, _: Input<()>, _: &Context<'_>) -> Effects<()> {
+                Effects::none()
+            }
+            fn view(
+                &self,
+                _: ConnectionId,
+                ui: &mut Ui<'_, ()>,
+                _: &Context<'_>,
+            ) -> Option<Node<()>> {
+                Some(ui.component(|| Loader { text: "loading" }))
+            }
+        }
+
+        #[tokio::test]
+        async fn components_tasks_report_back_through_the_host() {
+            tokio::time::timeout(Duration::from_secs(10), async {
+                let (session, mut lfs) = pair().await;
+                let host = Host::spawn(session);
+                let _service = host.start(Loading).await.unwrap();
+                lfs.send(Ncn {
+                    ucid: ConnectionId(5),
+                    uname: "player".into(),
+                    ..Default::default()
+                })
+                .await;
+                let loading = btn(&mut lfs).await;
+                assert_eq!(loading.text, "loading");
+                let loaded = btn(&mut lfs).await;
+                assert_eq!(
+                    (loaded.clickid, loaded.text.as_str()),
+                    (loading.clickid, "loaded")
+                );
+                host.shutdown().await.unwrap();
+            })
+            .await
+            .unwrap();
         }
 
         #[tokio::test]

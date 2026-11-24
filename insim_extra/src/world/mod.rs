@@ -1,8 +1,10 @@
 //! A [`World`] mirrors what the server knows: connections, players, game state
 //! and the race, all in one place.
 //!
-//! Feed it packets with [`apply`](World::apply): act on the
-//! events, and send the requests it needs to stay in step. Or let [`SharedWorld::attach`] do all of that for a split session.
+//! Feed it packets with [`apply`](World::apply): act on the events, and send
+//! the requests it needs to stay in step. Send [`World::startup`] once on
+//! connect, so it learns what was there before you; [`WorldEvent::Ready`]
+//! follows once every reply is in. kitcar's host does all of this for you.
 //! Per-connection commands (kick, spec, penalties, car restrictions) live on
 //! [`ConnectionInfo`].
 //!
@@ -15,6 +17,9 @@
 //!
 //! ```ignore
 //! let mut world = World::new();
+//! for request in World::startup() {
+//!     session.write(request).await?;
+//! }
 //!
 //! loop {
 //!     let packet = session.read().await?;
@@ -24,6 +29,7 @@
 //!     }
 //!     for event in events {
 //!         match event {
+//!             WorldEvent::Ready(_) => { /* caught up with the server */ }
 //!             WorldEvent::Connected(Connected { info, existing: false }) => { /* greet */ }
 //!             WorldEvent::SessionStarted(SessionStarted { kind }) => { /* ... */ }
 //!             WorldEvent::Race(re) => { /* ... */ }
@@ -33,7 +39,7 @@
 //! }
 //! ```
 
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, time::Duration};
 
 use insim::{
     WithRequestId,
@@ -44,9 +50,7 @@ use insim::{
         RaceInProgress, RaceLaps, Rst, Slc, SmallType, Sta, StaFlags, Tiny, TinyType, Toc, Ver,
     },
 };
-use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
-mod attach;
 mod connection;
 pub mod event;
 pub mod game;
@@ -67,7 +71,6 @@ use race::{EntrantId, EntrantState, RaceState};
 /// Connections, players, game state and race, kept in step with the server.
 ///
 /// kitcar hands services a `&World` for each input, settled as of that input.
-/// To share one between tasks, wrap it in a [`SharedWorld`].
 ///
 /// Use [`World::new()`] for sprints and qualifying, where every join is a fresh
 /// entrant. Use [`World::with_rejoin()`] for endurance races, where a driver may
@@ -98,6 +101,11 @@ pub struct World {
     /// fresh one. Set once at construction.
     pub(crate) rejoin: bool,
 }
+
+/// The ReqI the world's own requests go out with.
+const REQI: RequestId = RequestId(1);
+/// The ReqI of the startup ping, whose reply means every startup reply is in.
+const READY_REQI: RequestId = RequestId(2);
 
 fn lobby_ready(inner: &World) -> bool {
     inner.sta_received
@@ -427,6 +435,12 @@ fn dispatch(inner: &mut World, packet: &insim::Packet, events: &mut Vec<WorldEve
             push_race!(inner.apply_telepit(plp));
         },
         Packet::Tiny(tiny) => {
+            // The startup ping's reply: LFS answers in order, so every startup
+            // reply before it is in.
+            if tiny.subt == TinyType::Reply && tiny.reqi == READY_REQI && !inner.ready {
+                inner.ready = true;
+                events.push(WorldEvent::Ready(WorldReady));
+            }
             for player in inner.apply_tiny_clr(tiny) {
                 push_race!(inner.on_player_left(&player));
                 events.push(WorldEvent::PlayerLeft(PlayerLeft(player)));
@@ -467,7 +481,7 @@ fn dispatch(inner: &mut World, packet: &insim::Packet, events: &mut Vec<WorldEve
                 inner.requests.extend(
                     World::SESSION_REQUESTS
                         .iter()
-                        .map(|t| t.clone().with_request_id(RequestId(1)).into()),
+                        .map(|t| t.clone().with_request_id(REQI).into()),
                 );
             }
         },
@@ -546,8 +560,8 @@ impl std::fmt::Debug for World {
 }
 
 impl World {
-    /// Sent once on connect. LFS does not volunteer existing connections,
-    /// players or game state.
+    /// What [`startup`](Self::startup) asks for. LFS does not volunteer
+    /// existing connections, players or game state.
     pub const STARTUP_REQUESTS: &[TinyType] = &[
         TinyType::Ncn,
         TinyType::Npl,
@@ -562,6 +576,18 @@ impl World {
     /// allowed cars and mods, players and grid order.
     pub const SESSION_REQUESTS: &[TinyType] =
         &[TinyType::Alc, TinyType::Mal, TinyType::Npl, TinyType::Reo];
+
+    /// Send these once on connect: each of
+    /// [`STARTUP_REQUESTS`](Self::STARTUP_REQUESTS), then a ping. LFS answers
+    /// requests in order, so when [`apply`](Self::apply) sees the ping's reply
+    /// every startup reply is in, and it reports [`WorldEvent::Ready`].
+    pub fn startup() -> Vec<insim::Packet> {
+        Self::STARTUP_REQUESTS
+            .iter()
+            .map(|t| t.clone().with_request_id(REQI).into())
+            .chain([TinyType::Ping.with_request_id(READY_REQI).into()])
+            .collect()
+    }
 
     /// Every join is a fresh entrant. Right for sprints, qualifying and practice.
     pub fn new() -> Self {
@@ -597,18 +623,11 @@ impl World {
         }
     }
 
-    /// Every reply to [`STARTUP_REQUESTS`](Self::STARTUP_REQUESTS) has been
-    /// folded, so the world knows what existed before you connected. Anything
-    /// started later misses [`WorldEvent::Ready`] and should check this instead.
+    /// Every reply to [`startup`](Self::startup) has been folded, so the world
+    /// knows what existed before you connected. Anything started later misses
+    /// [`WorldEvent::Ready`] and should check this instead.
     pub fn is_ready(&self) -> bool {
         self.ready
-    }
-
-    /// Record that the world has caught up. Whatever keeps it in step
-    /// ([`SharedWorld::attach`], kitcar's host) calls this just before reporting
-    /// [`WorldEvent::Ready`]. Returns `true` the first time.
-    pub fn mark_ready(&mut self) -> bool {
-        !std::mem::replace(&mut self.ready, true)
     }
 
     /// Players' connections, leaving out the server's own (UCID 0).
@@ -762,37 +781,6 @@ impl IntoIterator for Applied {
 
     fn into_iter(self) -> Self::IntoIter {
         self.events.into_iter()
-    }
-}
-
-/// A cheap, cloneable handle to a [`World`] shared between tasks, as used by
-/// [`SharedWorld::attach`] and kitcar's `Host::world()`. Lock briefly with
-/// [`read`](Self::read) and never hold the guard across an `.await`.
-#[derive(Clone, Default)]
-pub struct SharedWorld {
-    inner: Arc<RwLock<World>>,
-}
-
-impl SharedWorld {
-    /// Share `world`.
-    pub fn new(world: World) -> Self {
-        Self {
-            inner: Arc::new(RwLock::new(world)),
-        }
-    }
-    /// Read the world.
-    pub fn read(&self) -> RwLockReadGuard<'_, World> {
-        self.inner.read()
-    }
-    /// Write access, for whoever folds packets in.
-    pub fn write(&self) -> RwLockWriteGuard<'_, World> {
-        self.inner.write()
-    }
-}
-
-impl std::fmt::Debug for SharedWorld {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.inner.read().fmt(f)
     }
 }
 
@@ -1178,7 +1166,7 @@ mod reply_tests {
     use insim::{
         Packet,
         identifiers::{ConnectionId, PlayerId, RequestId},
-        insim::{Ncn, Npl, Rst, TinyType},
+        insim::{Ncn, Npl, Rst, Tiny, TinyType},
     };
 
     use super::{Connected, PlayerJoined, World, WorldEvent};
@@ -1237,6 +1225,32 @@ mod reply_tests {
         // ...but a live rejoin is reported.
         assert_eq!(joined(&world.apply(&npl(0, 7)).events), [false]);
         assert_eq!(world.connection_count(), 2);
+    }
+
+    #[test]
+    fn ready_once_the_startup_pings_reply_is_in() {
+        let startup = World::startup();
+        let Some(Packet::Tiny(ping)) = startup.last() else {
+            panic!("startup ends with a ping: {startup:?}");
+        };
+        assert_eq!(ping.subt, TinyType::Ping);
+
+        let mut world = World::new();
+        let reply = |reqi| {
+            Packet::from(Tiny {
+                subt: TinyType::Reply,
+                reqi,
+            })
+        };
+        // Someone else's ping doesn't count.
+        assert!(world.apply(&reply(RequestId(9))).events.is_empty());
+        assert!(!world.is_ready());
+
+        let events = world.apply(&reply(ping.reqi)).events;
+        assert!(matches!(events[..], [WorldEvent::Ready(_)]), "{events:?}");
+        assert!(world.is_ready());
+        // Only once.
+        assert!(world.apply(&reply(ping.reqi)).events.is_empty());
     }
 
     #[test]

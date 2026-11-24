@@ -9,6 +9,28 @@
 //! kitcar's `Host` drives a service's `view` for you, or drive a [`Screen`]
 //! yourself.
 //!
+//! # Effects
+//!
+//! A component's [`mounted`](Component::mounted) and
+//! [`update`](Component::update) return [`Effects`]: timers, tasks and streams
+//! whose messages come back to that instance, and what to
+//! [`emit`](Effects::emit) to its parent. Load a page from the database as the
+//! component mounts, refetch when a button is clicked, close a toast after a
+//! few seconds. The work runs on Tokio and is aborted when the instance
+//! unmounts, so a closed dialog never hears back from its query. Data comes in
+//! through props; clone what a task needs (a pool, an id) into it.
+//!
+//! Anything outside the UI, such as sending packets, is the service's job:
+//! emit, and let [`Child::on`] turn it into a service message.
+//!
+//! Countdowns and clocks that only *show* the time don't need timers: draw
+//! them from [`Ui::now`] and ask for the next frame with [`Ui::redraw_at`] or
+//! [`Ui::countdown`]. Use a timer when something should *change* at a time.
+//!
+//! kitcar's `Host` routes results back for you. Driving a [`Screen`] yourself,
+//! make it [`Screen::with_outbox`] and pass each [`Delivery`] to
+//! [`Screen::deliver`].
+//!
 //! Sizes and offsets are UI units on LFS's 200 x 200 button grid. Numeric
 //! builders take integers or floats, so `.w(30).h(6).p(2).top(5)` works.
 //!
@@ -41,11 +63,14 @@
 
 pub mod canvas;
 mod component;
+pub mod components;
+mod effects;
 pub mod id_pool;
 mod node;
 
 pub use canvas::{Canvas, CanvasDiff};
-pub use component::{Child, Component, Key, Screen, Ui};
+pub use component::{Child, Component, Delivery, Key, Outbox, Screen, Ui};
+pub use effects::Effects;
 pub use node::{Action, Node};
 
 /// Empty container, handy as a layout root.
