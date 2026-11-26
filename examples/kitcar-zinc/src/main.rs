@@ -42,15 +42,15 @@ use insim::{
     Session,
     core::vehicle::Vehicle,
     identifiers::RequestId,
-    insim::{Isi, IsiFlags, RaceLaps},
+    insim::{Isi, IsiFlags, RaceLaps, VtnAction},
 };
 use insim_extra::{
     commands::time::{Month, TimeOfDay},
     kitcar::{
         Host,
-        director::{Combo, Cycle, Every, Layout, RaceDirector, StartOrder},
+        director::{Combo, Cycle, Layout, RaceDirector, StartOrder},
         error::HostError,
-        services::motd::Motd,
+        services::{motd::Motd, no_vote::NoVote},
     },
 };
 
@@ -87,9 +87,6 @@ const FERN_BAY: &[Vehicle] = &[Vehicle::Uf1, Vehicle::Xfg, MOD_1DFF72];
 
 /// BL3 rallycross: the starter UF1, and the first car a point earns.
 const RALLYCROSS: &[Vehicle] = &[Vehicle::Uf1, MOD_1DFF72];
-
-/// Races per combo before rotating.
-const RACES_PER_COMBO: u32 = 1;
 
 #[derive(Parser, Debug)]
 #[command(about = "ZINC Is Not CTRA: rotation, points, and cars unlocked by points")]
@@ -154,12 +151,14 @@ async fn main() -> Result<(), HostError> {
         speed: 60,
     };
     // Each combo names its cars: the director greys out the rest in the
-    // garage, and ZINC's licences narrow it per driver at the join.
+    // garage, and ZINC's licences narrow it per driver at the join. One race
+    // each, then the next track.
     let combo = |track: &str, times: &[TimeOfDay], cars: &[Vehicle]| {
         Combo::untimed(track.parse().expect("a valid track code"))
             .laps(RaceLaps::Laps(1))
             .times(times.iter().copied())
-            .vehicles(cars.to_vec())
+            .vehicles(cars.iter().copied())
+            .races(1)
     };
     let ladder = ladder_cars();
     // Each start order and the pit rule come up at least once a pass, so a
@@ -169,24 +168,39 @@ async fn main() -> Result<(), HostError> {
             // First, so they come up straight away: layouts loaded by name.
             // The Mini Oval is tiny, so it runs 10 laps, in UF1s for the lols.
             combo("KY1X", &[midday], &[Vehicle::Uf1])
-                .layout(Some(Layout::Axload("Mini Oval".into())))
-                .laps(RaceLaps::Laps(10)),
+                .layout(Layout::Axload("Mini Oval".into()))
+                .laps(RaceLaps::Laps(10))
+                .name("Kyoto Mini Oval"),
             combo("SO6X", &[midday], &ladder)
-                .layout(Some(Layout::Axload("Park Life Circuit V1".into()))),
+                .layout(Layout::Axload("Park Life Circuit V1".into()))
+                .name("Park Life Circuit"),
             combo("FE1", &[midnight, midday, into_the_night], FERN_BAY)
                 .laps(RaceLaps::Laps(3))
                 .must_pit(true)
-                .start(StartOrder::Reverse),
-            combo("AS1", &[TimeOfDay::live()], &ladder).start(StartOrder::Random),
-            combo("BL1", &[sunrise], &ladder),
-            combo("BL3", &[midday], RALLYCROSS).start(StartOrder::Random),
+                .start(StartOrder::Reverse)
+                .name("Fern Bay Club"),
+            combo("AS1", &[TimeOfDay::live()], &ladder)
+                .start(StartOrder::Random)
+                .name("Aston Cadet"),
+            combo("BL1", &[sunrise], &ladder).name("Blackwood GP"),
+            combo("BL3", &[midday], RALLYCROSS)
+                .start(StartOrder::Random)
+                .name("Blackwood Rallycross"),
         ])
         .shuffle(),
     )
-    .every(Every::Races(RACES_PER_COMBO))
     .auto_restart(Duration::from_secs(60));
     host.start_director(director).await?;
     let _zinc = host.start(zinc::service(LICENCES)).await?;
+    // A restart or qualifying vote would cut across the director's rotation.
+    // Voting to end the race is fine: the director moves on from there.
+    let _no_vote = host
+        .start(
+            NoVote::new([VtnAction::Restart, VtnAction::Qualify]).message(
+                "^3Sorry, no restart or qualifying votes here - races restart on their own",
+            ),
+        )
+        .await?;
     let _motd = host
         .start(
             Motd::new("ZINC Is Not CTRA")

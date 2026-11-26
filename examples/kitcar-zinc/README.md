@@ -2,8 +2,9 @@
 
 ZINC Is Not CTRA: a small tribute to the community-run LFS network whose points and licence system made clean public racing work. Not affiliated.
 
-- Races rotate, reshuffled each pass, through KY1X with the "Mini Oval" layout (10 laps, UF1 only), SO6X with the "Park Life Circuit V1" layout, FE1 (3 laps with a pit stop and a reversed grid, at midnight, midday, or an evening race into the dark, picked each visit), AS1 on live time with a random grid, BL1 at sunrise, and BL3 rallycross with a random grid. The rest are one lap. FE1 allows the UF1, XFG and 1DFF72, BL3 the UF1 and 1DFF72, and AS1 and BL1 every car on the licence ladder. Finished races restart on their own, 60 seconds after the winner.
+- Races rotate, reshuffled each pass, through KY1X with the "Mini Oval" layout (10 laps, UF1 only), SO6X with the "Park Life Circuit V1" layout, FE1 (3 laps with a pit stop and a reversed grid, at midnight, midday, or an evening race into the dark, picked each visit), AS1 on live time with a random grid, BL1 at sunrise, and BL3 rallycross with a random grid. The rest are one lap. FE1 allows the UF1, XFG and 1DFF72, BL3 the UF1 and 1DFF72, and AS1 and BL1 every car on the licence ladder. Each track gets one race: 60 seconds after the winner finishes, the next track comes up.
 - A confirmed, clean result earns a point. Yellow flags and collisions are counted, but only while you're racing.
+- Votes to restart or qualify are cancelled, with a message saying why, as they'd cut across the rotation. Voting to end the race still works.
 - A message of the day greets everyone as they connect, and stays until they close it.
 - Each point unlocks the next cars, and you keep them. ZINC checks your licence as you join the track, so locked cars are turned away:
 

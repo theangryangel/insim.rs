@@ -10,7 +10,10 @@ use insim::{
     insim::{RaceFlags, RaceLaps},
 };
 use insim_extra::{
-    kitcar::{Context, director::RaceDirectorStatus},
+    kitcar::{
+        Context,
+        director::{Combo, RaceDirectorStatus},
+    },
     ui::{self, Node, Ui},
     world::{
         World,
@@ -92,13 +95,14 @@ fn round(director: RaceDirectorStatus<'_>, ui: &mut Ui<'_, Msg>) -> String {
         return "^3loading the next track".to_string();
     }
     let track = director.combo.map(|combo| combo.track);
-    let upcoming = director.next.map(|combo| combo.track);
+    let upcoming = director.next;
     // Only worth naming if it's a different track.
-    let next = upcoming.filter(|next| Some(*next) != track);
+    let next = upcoming
+        .filter(|next| Some(next.track) != track)
+        .map(Combo::display_name);
     let last_race = director.races.is_some_and(|(done, of)| done + 1 >= of);
     let restart_in = director.restart_at.map(|at| ui.countdown(at));
-    let rotates_in = director.rotates_at.map(|at| ui.countdown(at));
-    match (restart_in, director.races, rotates_in) {
+    match (restart_in, director.races) {
         // The same track again unless this was its last race, and the
         // rotation names a different one (or can't say).
         (Some(secs), ..) => match (last_race, upcoming, next) {
@@ -106,21 +110,14 @@ fn round(director: RaceDirectorStatus<'_>, ui: &mut Ui<'_, Msg>) -> String {
             (true, None, None) => format!("^3Track change in {secs}s"),
             _ => format!("^3Restart in {secs}s"),
         },
-        (None, Some((done, of)), _) => {
+        (None, Some((done, of))) => {
             let race = format!("^7race {} of {of}", (done + 1).min(of));
             match next {
                 Some(next) if last_race => format!("{race} ^8- then ^7{next}"),
                 _ => race,
             }
         },
-        (None, None, Some(secs)) => {
-            let clock = format!("{}:{:02}", secs / 60, secs % 60);
-            match next {
-                Some(next) => format!("^7Track change: {next} in {clock}"),
-                None => format!("^7Track change in {clock}"),
-            }
-        },
-        (None, None, None) => String::new(),
+        (None, None) => String::new(),
     }
 }
 
@@ -158,6 +155,12 @@ fn race(ucid: ConnectionId, cx: &Context<'_>) -> String {
     let Some(track) = world.track() else {
         return "^8Waiting for the server".to_string();
     };
+    // The director's combo's name, if it's the one on the server.
+    let track = cx
+        .director()
+        .and_then(|director| director.combo)
+        .filter(|combo| combo.track == track)
+        .map_or_else(|| track.to_string(), Combo::display_name);
     let (laps, flags) = match world.session() {
         // Only the director knows whether the lobby is ready yet.
         None if cx.director().is_some_and(|director| !director.ready) => {
@@ -451,14 +454,6 @@ mod tests {
         };
         assert_eq!(round(same), "^3Restart in 8s");
 
-        let timed = RaceDirectorStatus {
-            combo: Some(&fe1),
-            next: Some(&as1),
-            rotates_at: secs(272),
-            ..Default::default()
-        };
-        assert_eq!(round(timed), "^7Track change: AS1 in 4:32");
-
         // One combo forever: nothing to rotate to.
         let forever = RaceDirectorStatus {
             combo: Some(&fe1),
@@ -472,5 +467,27 @@ mod tests {
             ..racing
         };
         assert_eq!(round(loading), "^3loading the next track");
+    }
+
+    #[test]
+    fn shows_combo_names() {
+        let zinc = Zinc::new(crate::LICENCES);
+        let now = Instant::now();
+        let bl1 = Combo::untimed("BL1".parse().unwrap()).name("Blackwood GP");
+        let as1 = Combo::untimed("AS1".parse().unwrap()).name("Aston Cadet");
+        let status = RaceDirectorStatus {
+            ready: true,
+            combo: Some(&bl1),
+            next: Some(&as1),
+            races: Some((1, 2)),
+            ..Default::default()
+        };
+
+        let lobby = topbar_at(&zinc, &lobby(), Some(status), now);
+        assert_eq!(lobby.race, "^7Blackwood GP ^8- ^7lobby, type ^3/ready");
+        assert_eq!(lobby.round, "^7race 2 of 2 ^8- then ^7Aston Cadet");
+
+        let racing = topbar_at(&zinc, &racing(), Some(status), now);
+        assert_eq!(racing.race, "^7Blackwood GP ^8- ^7lap 1/5");
     }
 }

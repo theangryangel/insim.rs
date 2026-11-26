@@ -5,8 +5,10 @@
 //!
 //! - [`router`]: handlers for events and chat commands. Ideal for bots.
 //! - [`motd`]: a message of the day, shown to each player as they connect.
+//! - [`no_vote`]: cancels players' votes for chosen actions.
 //! - [`penalty_clearer`]: clears each penalty after a fixed delay.
 
 pub mod motd;
+pub mod no_vote;
 pub mod penalty_clearer;
 pub mod router;
