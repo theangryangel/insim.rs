@@ -780,7 +780,7 @@ mod tests {
         }
 
         let world = world();
-        let bl3 = Combo::untimed("BL3".parse().unwrap()).vehicles(vec![
+        let bl3 = Combo::untimed("BL3".parse().unwrap()).vehicles([
             Vehicle::Uf1,
             Vehicle::Xfr,
             Vehicle::Xrg,
@@ -894,10 +894,10 @@ mod tests {
         assert_eq!(chat(&refused), ["^1!rotate is for admins only"]);
 
         let rotated = zinc.update(command_from(3, "!rotate"), &cx);
-        assert_eq!(
-            rotated.director_commands().collect::<Vec<_>>(),
-            [&DirectorCommand::Rotate]
-        );
+        assert!(matches!(
+            rotated.director_commands().collect::<Vec<_>>()[..],
+            [DirectorCommand::Rotate]
+        ));
     }
 
     #[test]
@@ -1049,7 +1049,7 @@ mod tests {
         };
         use insim_extra::kitcar::{
             Host,
-            director::{Combo, Cycle, Every, RaceDirector},
+            director::{Combo, Cycle, RaceDirector},
         };
 
         /// Button texts until one contains `want`.
@@ -1067,10 +1067,9 @@ mod tests {
             let (session, mut lfs) = pair().await;
             let host = Host::spawn(session);
             let fe1: Track = "FE1".parse().unwrap();
-            let combo = |track: &str| Combo::untimed(track.parse().unwrap());
+            let combo = |track: &str| Combo::untimed(track.parse().unwrap()).races(1);
             host.start_director(
                 RaceDirector::new(Cycle::new([combo("FE1"), combo("AS1")]))
-                    .every(Every::Races(1))
                     .auto_restart(Duration::from_secs(60)),
             )
             .await
