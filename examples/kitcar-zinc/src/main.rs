@@ -165,14 +165,9 @@ async fn main() -> Result<(), HostError> {
     // test session exercises them all.
     let director = RaceDirector::new(
         Cycle::new([
-            // First, so they come up straight away: layouts loaded by name.
-            // The Mini Oval is tiny, so it runs 10 laps, in UF1s for the lols.
-            combo("KY1X", &[midday], &[Vehicle::Uf1])
-                .layout(Layout::Axload("Mini Oval".into()))
-                .laps(RaceLaps::Laps(10))
-                .name("Kyoto Mini Oval"),
             combo("SO6X", &[midday], &ladder)
                 .layout(Layout::Axload("Park Life Circuit V1".into()))
+                .laps(RaceLaps::Laps(3))
                 .name("Park Life Circuit"),
             combo("FE1", &[midnight, midday, into_the_night], FERN_BAY)
                 .laps(RaceLaps::Laps(3))
@@ -181,11 +176,19 @@ async fn main() -> Result<(), HostError> {
                 .name("Fern Bay Club"),
             combo("AS1", &[TimeOfDay::live()], &ladder)
                 .start(StartOrder::Random)
+                .laps(RaceLaps::Laps(3))
                 .name("Aston Cadet"),
-            combo("BL1", &[sunrise], &ladder).name("Blackwood GP"),
+            combo("KY1X", &[midday], &[Vehicle::Uf1])
+                .layout(Layout::Axload("Mini Oval".into()))
+                .laps(RaceLaps::Laps(5))
+                .name("Kyoto Mini Oval"),
+            combo("BL1", &[sunrise], &ladder)
+                .name("Blackwood GP")
+                .laps(RaceLaps::Laps(3)),
             combo("BL3", &[midday], RALLYCROSS)
                 .start(StartOrder::Random)
-                .name("Blackwood Rallycross"),
+                .name("Blackwood Rallycross")
+                .laps(RaceLaps::Laps(3)),
         ])
         .shuffle(),
     )
